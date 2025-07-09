@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="it" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendario Prenotazioni Casa Vacanze</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" xintegrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            user-select: none;
+            -webkit-user-select: none; /* For Safari */
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
+        }
+        .day-cell {
+            transition: all 0.1s ease-in-out;
+            border-radius: 9999px;
+            position: relative;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        .day-cell:hover:not(.occupied-range):not(.selection-preview) {
+            background-color: #f3f4f6; /* gray-100 */
+        }
+        .occupied-range {
+            background-color: #f3f4f6; /* gray-100 */
+            cursor: pointer;
+        }
+        .check-in {
+            background-color: #22c55e !important; /* green-500 */
+            color: white !important;
+        }
+        .check-out {
+            background-color: #ef4444 !important; /* red-500 */
+            color: white !important;
+        }
+        .guest-info, .guest-info div, .guest-info .time-info {
+             color: white !important;
+        }
+        .guest-info {
+            font-weight: 600;
+        }
+        .time-info {
+            font-size: 0.7rem;
+        }
+        .line-connector {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background-color: #f3f4f6; /* gray-100 */
+            z-index: -1;
+        }
+        .line-start .line-connector { left: 50%; }
+        .line-end .line-connector { right: 50%; }
+        .line-single .line-connector { display: none; }
+        
+        .selection-preview {
+            background-color: #bfdbfe !important; /* blue-200 */
+            color: #1e3a8a !important; /* blue-900 */
+        }
+        .selection-preview .line-connector {
+             background-color: #bfdbfe; /* blue-200 */
+        }
+    </style>
+</head>
+<body class="bg-white text-black p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-5xl mx-auto bg-white border border-gray-200 rounded-2xl shadow-lg p-6 relative">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-gray-200 pb-6">
+            <div class="text-center md:text-left">
+                <h1 class="text-3xl font-bold text-black">Calendario Prenotazioni</h1>
+                <p class="text-gray-600 mt-1">Clicca e trascina sui giorni liberi per creare una prenotazione.</p>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between mb-4">
+            <button id="prev-month" class="px-4 py-2 bg-gray-100 text-black rounded-lg hover:bg-gray-200 transition-colors">&lt;</button>
+            <h2 id="month-year" class="text-2xl font-semibold text-center w-full text-black"></h2>
+            <button id="next-month" class="px-4 py-2 bg-gray-100 text-black rounded-lg hover:bg-gray-200 transition-colors">&gt;</button>
+        </div>
+
+        <div id="delete-section" class="mb-6 p-4 bg-white border-y border-gray-200 flex flex-col sm:flex-row items-center gap-3">
+            <select id="guest-list-dropdown" class="flex-grow w-full sm:w-auto bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-black focus:ring-2 focus:ring-blue-500">
+                <option value="">Seleziona un ospite per cancellare...</option>
+            </select>
+            <button id="delete-selected-booking" disabled class="w-full sm:w-auto bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">
+                Cancella Prenotazione
+            </button>
+        </div>
+
+        <div id="calendar-grid" class="grid grid-cols-7 gap-x-2 gap-y-1">
+            <div class="text-center font-medium text-gray-500 py-2">Lun</div>
+            <div class="text-center font-medium text-gray-500 py-2">Mar</div>
+            <div class="text-center font-medium text-gray-500 py-2">Mer</div>
+            <div class="text-center font-medium text-gray-500 py-2">Gio</div>
+            <div class="text-center font-medium text-gray-500 py-2">Ven</div>
+            <div class="text-center font-medium text-gray-500 py-2">Sab</div>
+            <div class="text-center font-medium text-gray-500 py-2">Dom</div>
+        </div>
+    </div>
+
+    <!-- Modali -->
+    <div id="booking-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md transform transition-all border border-gray-200">
+            <h3 id="modal-title" class="text-2xl font-bold mb-4 text-black">Crea Nuova Prenotazione</h3>
+            <div class="mb-4 text-center bg-gray-100 p-3 rounded-lg text-black">
+                <p><span class="font-semibold">Check-in:</span> <span id="modal-check-in-date"></span></p>
+                <p><span class="font-semibold">Check-out:</span> <span id="modal-check-out-date"></span></p>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="guest-name" class="block text-sm font-medium text-gray-700 mb-1">Nome Ospite</label>
+                    <input type="text" id="guest-name" class="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg text-black" placeholder="Es. Mario Rossi">
+                </div>
+                <div class="flex gap-4">
+                     <div class="w-1/2">
+                        <label for="check-in-time" class="block text-sm font-medium text-gray-700 mb-1">Orario Check-in</label>
+                        <input type="time" id="check-in-time" value="14:00" class="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg text-black">
+                    </div>
+                     <div class="w-1/2">
+                        <label for="check-out-time" class="block text-sm font-medium text-gray-700 mb-1">Orario Check-out</label>
+                        <input type="time" id="check-out-time" value="11:00" class="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg text-black">
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button id="save-booking" class="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 font-semibold">Salva</button>
+                <button id="cancel-booking" class="w-full bg-gray-200 text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-300 font-semibold">Annulla</button>
+            </div>
+        </div>
+    </div>
+    <div id="details-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md border border-gray-200">
+            <h3 class="text-2xl font-bold mb-4 text-black">Dettagli Prenotazione</h3>
+            <div class="space-y-3 text-gray-700">
+                <p><span class="font-semibold w-24 inline-block">Ospite:</span> <span id="details-guest-name"></span></p>
+                <p><span class="font-semibold w-24 inline-block">Check-in:</span> <span id="details-check-in"></span></p>
+                <p><span class="font-semibold w-24 inline-block">Check-out:</span> <span id="details-check-out"></span></p>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button id="edit-booking" class="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 font-semibold">Modifica</button>
+                <button id="close-details-modal" class="w-full bg-gray-200 text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-300 font-semibold">Chiudi</button>
+            </div>
+        </div>
+    </div>
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-sm text-center border border-gray-200">
+            <h3 class="text-xl font-bold mb-4 text-black">Conferma Cancellazione</h3>
+            <p id="confirm-message" class="text-gray-600 mb-6"></p>
+            <div class="flex gap-4">
+                <button id="confirm-delete-btn" class="w-full bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 font-semibold">Conferma</button>
+                <button id="cancel-delete-btn" class="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 font-semibold">Annulla</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let bookings = {}; 
+        let guestBookings = new Map();
+
+        const monthYearEl = document.getElementById('month-year');
+        const calendarGridEl = document.getElementById('calendar-grid');
+        const prevMonthBtn = document.getElementById('prev-month');
+        const nextMonthBtn = document.getElementById('next-month');
+
+        let currentDate = new Date();
+        currentDate.setDate(1); 
+
+        const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+        
+        let isSelecting = false;
+        let selectionStartDate = null;
+        let selectionEndDate = null;
+
+        function generateCalendar(year, month) {
+            monthYearEl.textContent = `${monthNames[month]} ${year}`;
+            
+            const dayCells = calendarGridEl.querySelectorAll('.day-cell, .empty-cell');
+            dayCells.forEach(cell => cell.remove());
+
+            const firstDayOfMonth = new Date(year, month, 1);
+            const lastDayOfMonth = new Date(year, month + 1, 0);
+            
+            const emptyDays = (firstDayOfMonth.getDay() + 6) % 7;
+
+            for (let i = 0; i < emptyDays; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'empty-cell rounded-full aspect-ratio-1/1';
+                calendarGridEl.appendChild(emptyCell);
+            }
+
+            for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
+                const dayCell = document.createElement('div');
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                
+                dayCell.className = 'day-cell cursor-pointer bg-white';
+                dayCell.dataset.date = dateStr;
+
+                const dayNumber = document.createElement('span');
+                dayNumber.className = 'font-semibold text-black text-sm';
+                dayNumber.textContent = i;
+                
+                const guestInfo = document.createElement('div');
+                guestInfo.className = 'guest-info text-xs text-center break-words space-y-1';
+
+                dayCell.append(dayNumber, guestInfo);
+                dayCell.addEventListener('click', () => handleDayClick(dateStr));
+                calendarGridEl.appendChild(dayCell);
+            }
+            updateCalendarUI();
+        }
+        
+        function updateCalendarUI() {
+            const sortedDates = Object.keys(bookings).sort();
+            guestBookings.clear();
+            const guestRangeStarts = new Map();
+
+            for (const dateStr of sortedDates) {
+                const booking = bookings[dateStr];
+                if (!booking || !booking.guestName) continue;
+                const guestNameLower = booking.guestName.toLowerCase();
+                if (booking.isCheckIn) {
+                    if (!guestRangeStarts.has(guestNameLower)) guestRangeStarts.set(guestNameLower, dateStr);
+                }
+                if (booking.isCheckOut) {
+                    const startDateStr = guestRangeStarts.get(guestNameLower);
+                    if (startDateStr) {
+                        const start = new Date(Date.UTC(...startDateStr.split('-').map((n,i) => i === 1 ? n-1 : n)));
+                        const end = new Date(Date.UTC(...dateStr.split('-').map((n,i) => i === 1 ? n-1 : n)));
+                        const currentRange = [];
+                        for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+                            currentRange.push(d.toISOString().split('T')[0]);
+                        }
+                        guestBookings.set(guestNameLower, {start: startDateStr, end: dateStr, days: currentRange});
+                        guestRangeStarts.delete(guestNameLower);
+                    }
+                }
+            }
+            
+            document.querySelectorAll('.day-cell').forEach(cell => {
+                const dateStr = cell.dataset.date;
+                
+                const guestInfoEl = cell.querySelector('.guest-info');
+                const dayNumberEl = cell.querySelector('span');
+                cell.className = 'day-cell cursor-pointer'; 
+                guestInfoEl.innerHTML = '';
+                cell.dataset.bookingInfo = '';
+                const existingConnector = cell.querySelector('.line-connector');
+                if(existingConnector) existingConnector.remove();
+
+                let bookingInfoForThisDay = null;
+                for (const bookingInfo of guestBookings.values()) {
+                    if (bookingInfo.days.includes(dateStr)) {
+                        bookingInfoForThisDay = bookingInfo;
+                        break;
+                    }
+                }
+
+                if (bookingInfoForThisDay) {
+                    cell.classList.add('occupied-range');
+                    cell.dataset.bookingInfo = JSON.stringify(bookingInfoForThisDay);
+                    
+                    const { start, end } = bookingInfoForThisDay;
+
+                    if (start !== end) {
+                        if (dateStr === start) cell.classList.add('line-start');
+                        else if (dateStr === end) cell.classList.add('line-end');
+                        else cell.classList.add('line-middle');
+                        const connector = document.createElement('div');
+                        connector.className = 'line-connector';
+                        cell.appendChild(connector);
+                    } else {
+                         cell.classList.add('line-single');
+                    }
+                    
+                    const bookingData = bookings[dateStr];
+                    if (bookingData) { 
+                        dayNumberEl.className = 'font-semibold text-white text-sm';
+                        let infoHtml = '';
+                        if (bookingData.isCheckIn) {
+                            cell.classList.add('check-in');
+                            infoHtml += `<div class="font-semibold">${bookingData.guestName}</div>`;
+                            if(bookingData.checkInTime) infoHtml += `<div class="time-info">${bookingData.checkInTime}</div>`;
+                        }
+                        if (bookingData.isCheckOut) {
+                            cell.classList.add('check-out');
+                            if (!bookingData.isCheckIn) {
+                                infoHtml += `<div class="font-semibold">${bookingData.guestName}</div>`;
+                            }
+                            if(bookingData.checkOutTime) infoHtml += `<div class="time-info">${bookingData.checkOutTime}</div>`;
+                        }
+                        guestInfoEl.innerHTML = infoHtml;
+                    } else { 
+                        dayNumberEl.className = 'font-semibold text-gray-400 text-sm';
+                    }
+                } else {
+                    cell.classList.add('bg-white');
+                    dayNumberEl.className = 'font-semibold text-black text-sm';
+                }
+            });
+
+            const guestDropdown = document.getElementById('guest-list-dropdown');
+            const deleteSelectedBtn = document.getElementById('delete-selected-booking');
+            const currentSelection = guestDropdown.value;
+            guestDropdown.innerHTML = '<option value="">Seleziona un ospite per cancellare...</option>';
+            [...guestBookings.keys()].sort().forEach(guestNameLower => {
+                const originalGuestName = bookings[guestBookings.get(guestNameLower).start].guestName; 
+                const option = document.createElement('option');
+                option.value = guestNameLower;
+                option.textContent = originalGuestName;
+                guestDropdown.appendChild(option);
+            });
+            guestDropdown.value = currentSelection;
+            deleteSelectedBtn.disabled = guestDropdown.value === '';
+        }
+        
+        const bookingModal = document.getElementById('booking-modal');
+        const detailsModal = document.getElementById('details-modal');
+        const confirmModal = document.getElementById('confirm-modal');
+        const guestNameInput = document.getElementById('guest-name');
+        const checkInTimeInput = document.getElementById('check-in-time');
+        const checkOutTimeInput = document.getElementById('check-out-time');
+        const saveBtn = document.getElementById('save-booking');
+        const cancelBtn = document.getElementById('cancel-booking');
+        const modalCheckInDateEl = document.getElementById('modal-check-in-date');
+        const modalCheckOutDateEl = document.getElementById('modal-check-out-date');
+
+        function capitalizeName(name) {
+            return name.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        }
+
+        function openBookingModal(checkIn, checkOut, bookingInfo = null) {
+            document.getElementById('modal-title').textContent = bookingInfo ? 'Modifica Prenotazione' : 'Crea Nuova Prenotazione';
+            modalCheckInDateEl.textContent = checkIn;
+            modalCheckOutDateEl.textContent = checkOut;
+            
+            if (bookingInfo) {
+                const startBooking = bookings[bookingInfo.start];
+                const endBooking = bookings[bookingInfo.end];
+                guestNameInput.value = startBooking.guestName || '';
+                checkInTimeInput.value = startBooking.checkInTime || '14:00';
+                checkOutTimeInput.value = endBooking.checkOutTime || '11:00';
+                saveBtn.onclick = () => saveExistingBooking(bookingInfo);
+            } else {
+                guestNameInput.value = '';
+                checkInTimeInput.value = '14:00';
+                checkOutTimeInput.value = '11:00';
+                saveBtn.onclick = () => saveNewBooking(checkIn, checkOut);
+            }
+            bookingModal.classList.remove('hidden');
+        }
+
+        function closeBookingModal() { bookingModal.classList.add('hidden'); }
+        
+        function openDetailsModal(bookingInfo) {
+            const startBooking = bookings[bookingInfo.start];
+            const endBooking = bookings[bookingInfo.end];
+            document.getElementById('details-guest-name').textContent = startBooking?.guestName || 'N/D';
+            document.getElementById('details-check-in').textContent = `${bookingInfo.start} ore ${startBooking?.checkInTime || ''}`;
+            document.getElementById('details-check-out').textContent = `${bookingInfo.end} ore ${endBooking?.checkOutTime || ''}`;
+            document.getElementById('edit-booking').onclick = () => {
+                closeDetailsModal();
+                openBookingModal(bookingInfo.start, bookingInfo.end, bookingInfo);
+            };
+            detailsModal.classList.remove('hidden');
+        }
+        
+        function closeDetailsModal() { detailsModal.classList.add('hidden'); }
+
+        function openConfirmModal(message, onConfirm) {
+            document.getElementById('confirm-message').textContent = message;
+            confirmModal.classList.remove('hidden');
+            document.getElementById('confirm-delete-btn').onclick = () => { onConfirm(); closeConfirmModal(); };
+        }
+
+        function closeConfirmModal() { confirmModal.classList.add('hidden'); }
+
+        document.getElementById('close-details-modal').addEventListener('click', closeDetailsModal);
+        document.getElementById('cancel-delete-btn').addEventListener('click', closeConfirmModal);
+
+        function saveBookingsToLocalStorage() {
+            localStorage.setItem('calendarAppBookings', JSON.stringify(bookings));
+        }
+
+        function loadBookingsFromLocalStorage() {
+            const savedBookings = localStorage.getItem('calendarAppBookings');
+            bookings = savedBookings ? JSON.parse(savedBookings) : {};
+        }
+
+        function saveNewBooking(startDate, endDate) {
+            const guestNameRaw = guestNameInput.value.trim();
+            if (!guestNameRaw) {
+                guestNameInput.focus();
+                guestNameInput.classList.add('border-red-500');
+                return;
+            }
+            guestNameInput.classList.remove('border-red-500');
+            const guestName = capitalizeName(guestNameRaw);
+            const checkInTime = checkInTimeInput.value;
+            const checkOutTime = checkOutTimeInput.value;
+
+            if (startDate === endDate) {
+                bookings[startDate] = { guestName, isCheckIn: true, isCheckOut: true, checkInTime, checkOutTime };
+            } else {
+                bookings[startDate] = { guestName, isCheckIn: true, isCheckOut: false, checkInTime };
+                bookings[endDate] = { guestName, isCheckIn: false, isCheckOut: true, checkOutTime };
+            }
+            saveBookingsToLocalStorage();
+            updateCalendarUI();
+            closeBookingModal();
+        }
+        
+        function saveExistingBooking(bookingInfo) {
+            const guestNameRaw = guestNameInput.value.trim();
+            if (!guestNameRaw) {
+                guestNameInput.focus();
+                guestNameInput.classList.add('border-red-500');
+                return;
+            }
+            guestNameInput.classList.remove('border-red-500');
+            const guestName = capitalizeName(guestNameRaw);
+            const checkInTime = checkInTimeInput.value;
+            const checkOutTime = checkOutTimeInput.value;
+
+            bookings[bookingInfo.start].guestName = guestName;
+            bookings[bookingInfo.start].checkInTime = checkInTime;
+
+            if (bookingInfo.start !== bookingInfo.end) {
+                bookings[bookingInfo.end].guestName = guestName;
+                bookings[bookingInfo.end].checkOutTime = checkOutTime;
+            } else {
+                 bookings[bookingInfo.start].checkOutTime = checkOutTime;
+            }
+            saveBookingsToLocalStorage();
+            updateCalendarUI();
+            closeBookingModal();
+        }
+
+        prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); generateCalendar(currentDate.getFullYear(), currentDate.getMonth()); });
+        nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); generateCalendar(currentDate.getFullYear(), currentDate.getMonth()); });
+        cancelBtn.addEventListener('click', closeBookingModal);
+
+        function handleSelectionStart(event) {
+            if (event.type === 'touchstart') event.preventDefault();
+            const target = event.type === 'touchstart' ? event.touches[0].target : event.target;
+            const targetCell = target.closest('.day-cell');
+            if (!targetCell || targetCell.classList.contains('occupied-range')) return;
+            isSelecting = true;
+            selectionStartDate = targetCell.dataset.date;
+            selectionEndDate = targetCell.dataset.date;
+            updateSelectionPreview();
+        }
+
+        function handleSelectionMove(event) {
+            if (!isSelecting) return;
+            if (event.type === 'touchmove') event.preventDefault();
+            let target;
+            if (event.type === 'touchmove') {
+                const touch = event.touches[0];
+                target = document.elementFromPoint(touch.clientX, touch.clientY);
+            } else {
+                target = event.target;
+            }
+            const targetCell = target.closest('.day-cell');
+            if (targetCell) {
+                selectionEndDate = targetCell.dataset.date;
+                updateSelectionPreview();
+            }
+        }
+
+        function handleSelectionEnd() {
+            if (!isSelecting) return;
+            isSelecting = false;
+            let start = selectionStartDate;
+            let end = selectionEndDate;
+            if (new Date(start) > new Date(end)) [start, end] = [end, start];
+            
+            let isConflict = false;
+            for (let d = new Date(Date.UTC(...start.split('-').map((n,i) => i === 1 ? n-1 : n))); d <= new Date(Date.UTC(...end.split('-').map((n,i) => i === 1 ? n-1 : n))); d.setUTCDate(d.getUTCDate() + 1)) {
+                if (document.querySelector(`.day-cell[data-date="${d.toISOString().split('T')[0]}"]`)?.classList.contains('occupied-range')) {
+                    isConflict = true;
+                    break;
+                }
+            }
+            clearSelectionPreview();
+            if (isConflict) { alert("La selezione non può includere giorni già prenotati."); return; }
+            openBookingModal(start, end);
+        }
+
+        calendarGridEl.addEventListener('mousedown', handleSelectionStart);
+        calendarGridEl.addEventListener('mousemove', handleSelectionMove);
+        window.addEventListener('mouseup', handleSelectionEnd);
+        calendarGridEl.addEventListener('touchstart', handleSelectionStart, { passive: false });
+        calendarGridEl.addEventListener('touchmove', handleSelectionMove, { passive: false });
+        window.addEventListener('touchend', handleSelectionEnd);
+        
+        function handleDayClick(dateStr) {
+            const cell = document.querySelector(`.day-cell[data-date="${dateStr}"]`);
+            if (cell && cell.dataset.bookingInfo) {
+                try { openDetailsModal(JSON.parse(cell.dataset.bookingInfo)); } catch(e) { console.error("Could not parse booking info", e); }
+            }
+        }
+
+        function updateSelectionPreview() {
+            clearSelectionPreview();
+            if (!selectionStartDate || !selectionEndDate) return;
+            let start = selectionStartDate;
+            let end = selectionEndDate;
+            if (new Date(start) > new Date(end)) [start, end] = [end, start];
+
+            document.querySelectorAll('.day-cell').forEach(cell => {
+                const date = cell.dataset.date;
+                if (date >= start && date <= end) {
+                    cell.classList.add('selection-preview');
+                    if (start === end) cell.classList.add('line-single');
+                    else if (date === start) cell.classList.add('line-start');
+                    else if (date === end) cell.classList.add('line-end');
+                    else cell.classList.add('line-middle');
+                    
+                    const connector = document.createElement('div');
+                    connector.className = 'line-connector';
+                    cell.appendChild(connector);
+                }
+            });
+        }
+
+        function clearSelectionPreview() {
+            document.querySelectorAll('.day-cell').forEach(cell => {
+                cell.classList.remove('selection-preview', 'line-start', 'line-middle', 'line-end', 'line-single');
+                const existingConnector = cell.querySelector('.line-connector');
+                if(existingConnector) existingConnector.remove();
+            });
+        }
+        
+        const guestDropdown = document.getElementById('guest-list-dropdown');
+        const deleteSelectedBtn = document.getElementById('delete-selected-booking');
+
+        guestDropdown.addEventListener('change', () => { deleteSelectedBtn.disabled = guestDropdown.value === ''; });
+
+        deleteSelectedBtn.addEventListener('click', () => {
+            const selectedGuestLower = guestDropdown.value;
+            if (!selectedGuestLower) return;
+            const bookingInfo = guestBookings.get(selectedGuestLower);
+            if (!bookingInfo) return;
+            const originalGuestName = bookings[bookingInfo.start].guestName;
+            
+            const onConfirmDelete = () => {
+                delete bookings[bookingInfo.start];
+                if (bookingInfo.start !== bookingInfo.end) {
+                    delete bookings[bookingInfo.end];
+                }
+                saveBookingsToLocalStorage();
+                updateCalendarUI();
+                guestDropdown.value = '';
+                deleteSelectedBtn.disabled = true;
+            };
+            openConfirmModal(`Sei sicuro di voler eliminare la prenotazione per ${originalGuestName}?`, onConfirmDelete);
+        });
+
+        function initialize() {
+            loadBookingsFromLocalStorage();
+            generateCalendar(currentDate.getFullYear(), currentDate.getMonth());
+        }
+
+        initialize();
+    </script>
+</body>
+</html>
