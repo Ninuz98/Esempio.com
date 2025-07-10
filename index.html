@@ -548,14 +548,12 @@
         }
 
         function handleSelectionEnd() {
-            if (!isSelecting) return;
-            isSelecting = false;
-            
-            if (!selectionStartDate || !selectionEndDate) {
-                clearSelectionPreview();
+            if (!isSelecting || !selectionStartDate || !selectionEndDate) {
+                isSelecting = false;
                 return;
             }
-
+            isSelecting = false;
+            
             let start = selectionStartDate;
             let end = selectionEndDate;
             if (new Date(start) > new Date(end)) [start, end] = [end, start];
