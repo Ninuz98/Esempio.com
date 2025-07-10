@@ -540,7 +540,7 @@
             } else {
                 target = event.target;
             }
-            const targetCell = target.closest('.day-cell');
+            const targetCell = target ? target.closest('.day-cell') : null;
             if (targetCell) {
                 selectionEndDate = targetCell.dataset.date;
                 updateSelectionPreview();
@@ -550,6 +550,12 @@
         function handleSelectionEnd() {
             if (!isSelecting) return;
             isSelecting = false;
+            
+            if (!selectionStartDate || !selectionEndDate) {
+                clearSelectionPreview();
+                return;
+            }
+
             let start = selectionStartDate;
             let end = selectionEndDate;
             if (new Date(start) > new Date(end)) [start, end] = [end, start];
