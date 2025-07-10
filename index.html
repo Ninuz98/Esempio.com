@@ -555,13 +555,18 @@
             if (new Date(start) > new Date(end)) [start, end] = [end, start];
             
             let isConflict = false;
-            for (let d = new Date(Date.UTC(...start.split('-').map((n,i) => i === 1 ? n-1 : n))); d <= new Date(Date.UTC(...end.split('-').map((n,i) => i === 1 ? n-1 : n))); d.setUTCDate(d.getUTCDate() + 1)) {
-                const dateStr = d.toISOString().split('T')[0];
+            let currentDate = new Date(Date.UTC(...start.split('-').map((n,i) => i === 1 ? n-1 : n)));
+            let endDateObj = new Date(Date.UTC(...end.split('-').map((n,i) => i === 1 ? n-1 : n)));
+
+            while(currentDate <= endDateObj) {
+                const dateStr = currentDate.toISOString().split('T')[0];
                 const dayBookings = bookings[dateStr] || [];
                 if (dateStr === start && dayBookings.some(b => b.eventType === 'checkin')) { isConflict = true; break; }
                 if (dateStr === end && dayBookings.some(b => b.eventType === 'checkout')) { isConflict = true; break; }
                 if (start !== dateStr && end !== dateStr && dayBookings.length > 0) { isConflict = true; break; }
+                currentDate.setUTCDate(currentDate.getUTCDate() + 1);
             }
+            
             clearSelectionPreview();
             if (isConflict) { alert("La selezione non può includere giorni già prenotati o sovrapporsi in modo non valido."); return; }
             openBookingModal(start, end);
